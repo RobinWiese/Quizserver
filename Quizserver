@@ -1,0 +1,85 @@
+package network;
+
+import java.io.*;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.util.ArrayList;
+
+public class Quizserver {
+    public static final int PORT = 10667;
+    private ServerSocket serverSocket;
+    private ArrayList<QuizserverThread> quizClientThreads;
+    
+    
+    //Quiz wird an alle Clienten geschickt, wenn jemand es beantwortet hat kommt: "user132u128z3 hat die Frage richtig beantwortet", ansonsten nichts 
+    //vllt. Punkte zählen je nachdem wer am schnellsten war oder so 
+
+    public Quizserver(){
+        try {
+            serverSocket = new ServerSocket(PORT);
+            quizClientThreads = new ArrayList<>();
+        } catch (IOException e) {
+            System.err.println("Fehler beim Öffnen von Port " + PORT);
+            System.exit(1);
+        }
+    }
+
+    public void run(){
+        System.out.println("ChatServer gestartet auf Port " + PORT);
+
+        while (true) {
+            try {
+                // Warte auf Client
+                Socket neueClientSocket = serverSocket.accept();
+                // Wenn verbunden, starte einen ClientThread
+                var neuerClient = new QuizserverThread(this,
+                        neueClientSocket);
+                quizClientThreads.add(neuerClient);
+                neuerClient.start();
+                System.out.println("Client Nr. " + quizClientThreads.size() + " " +
+                        "verbunden!");
+            } catch (IOException e) {
+                System.err.println("Fehler bei Verbindung mit Client");
+            }
+        }
+    }
+
+    public void sendeAnAlle(QuizserverThread client, String inhalt){
+        for(var empfaenger: quizClientThreads){
+            empfaenger.sende(client.getName() + ": " + inhalt);
+        }
+    }
+
+}
+
+class QuizserverThread extends Thread{
+    private Quizserver server;
+    private Socket clientSocket;
+    private BufferedReader reader;
+    private PrintWriter writer;
+    private String name;
+
+    public QuizserverThread(Quizserver server, Socket clientSocket){
+        this.server = server;
+        this.clientSocket = clientSocket;
+
+        try {
+            name = clientSocket.getInetAddress().getCanonicalHostName();
+            reader =
+                    new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+            writer =
+                    new PrintWriter(new OutputStreamWriter(clientSocket.getOutputStream()));
+        } catch (IOException e) {
+            // TODO
+            System.err.println("Fehler beim Schreiben auf dem Client " + name);
+            System.exit(2);
+        }
+    }
+
+
+    public void sende(String inhalt){
+        writer.println(inhalt);
+        writer.flush();
+    }
+
+}
